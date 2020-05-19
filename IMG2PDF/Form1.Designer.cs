@@ -64,7 +64,7 @@
             this.StartButton.TabIndex = 0;
             this.StartButton.Text = "Save";
             this.StartButton.UseVisualStyleBackColor = true;
-            this.StartButton.Click += new System.EventHandler(this.StartButton_Click);
+            this.StartButton.Click += new System.EventHandler(this.PDFButton_Click);
             // 
             // browseButton
             // 
@@ -100,21 +100,21 @@
             this.marginBoxLeft.Location = new System.Drawing.Point(128, 127);
             this.marginBoxLeft.Name = "marginBoxLeft";
             this.marginBoxLeft.Size = new System.Drawing.Size(27, 20);
-            this.marginBoxLeft.TabIndex = 5;
+            this.marginBoxLeft.TabIndex = 6;
             // 
             // marginBoxTop
             // 
             this.marginBoxTop.Location = new System.Drawing.Point(152, 101);
             this.marginBoxTop.Name = "marginBoxTop";
             this.marginBoxTop.Size = new System.Drawing.Size(27, 20);
-            this.marginBoxTop.TabIndex = 7;
+            this.marginBoxTop.TabIndex = 5;
             // 
             // marginBoxRight
             // 
             this.marginBoxRight.Location = new System.Drawing.Point(175, 127);
             this.marginBoxRight.Name = "marginBoxRight";
             this.marginBoxRight.Size = new System.Drawing.Size(27, 20);
-            this.marginBoxRight.TabIndex = 6;
+            this.marginBoxRight.TabIndex = 7;
             // 
             // marginBoxBottom
             // 
