@@ -5,6 +5,7 @@ using iText.Layout;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -136,33 +137,47 @@ namespace IMG2PDF {
 
                     for(int i = 0; i < files.Length; i++) {
                         // create image object
-                        iText.Layout.Element.Image img = new iText.Layout.Element.Image(ImageDataFactory.Create(files[i]));
+                        Bitmap sourceBitmap = new Bitmap(files[i]);
 
-                        // calculate ratios for resizing
+                        // calculate ratios for resizing, based on whether to rotate or not
                         float widthRatio, heightRatio;
-                        if(rotate && img.GetImageWidth() > img.GetImageHeight()) {
-                            img.SetRotationAngle(90 * Math.PI / 180f);
-                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / img.GetImageHeight();
-                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / img.GetImageWidth();
+                        if(rotate && sourceBitmap.Width > sourceBitmap.Height) {
+                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / sourceBitmap.Height;
+                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / sourceBitmap.Width;
                         }
                         else {
-                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / img.GetImageWidth();
-                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / img.GetImageHeight();
+                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / sourceBitmap.Width;
+                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / sourceBitmap.Height;
                         }
+                        // if margins are too big, throw exception
                         if(widthRatio < 0 || heightRatio < 0) {
                             throw new Exception("Image " + System.IO.Path.GetFileName(files[i]) + " cannot fit within the margins.");
                         }
+                        // scale by smaller ratio and convert to new bitmap without losing quality
                         float ratio = widthRatio < heightRatio ? widthRatio : heightRatio;
-                        img.ScaleToFit(img.GetImageWidth() * ratio, img.GetImageHeight() * ratio);
-                        Console.Write(
-                            "\nIMAGE " + i + System.IO.Path.GetFileName(files[i]) +
-                            "\nwidth:" + img.GetImageWidth() +
-                            "\nheight:" + img.GetImageHeight() +
-                            "\nscaled width:" + img.GetImageScaledWidth() +
-                            "\nscaled height:" + img.GetImageScaledHeight()
-                        );
+                        Bitmap scaledBitmap = new Bitmap((int)(sourceBitmap.Width * ratio), (int)(sourceBitmap.Height * ratio));
+                        scaledBitmap.SetResolution(sourceBitmap.HorizontalResolution, sourceBitmap.VerticalResolution);
+                        Graphics graphic = Graphics.FromImage(scaledBitmap);
+                        // TODO quality settings
+                        graphic.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                        graphic.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                        graphic.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        graphic.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                        graphic.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                        ImageAttributes attributes = new ImageAttributes();
+                        attributes.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
+                        graphic.DrawImage(sourceBitmap, new System.Drawing.Rectangle(0, 0, scaledBitmap.Width, scaledBitmap.Height),
+                            0, 0, sourceBitmap.Width, sourceBitmap.Height, GraphicsUnit.Pixel, attributes);
 
+                        // convert to byte array, then to itext image
+                        MemoryStream stream = new MemoryStream();
+                        // TODO change which image format is used
+                        scaledBitmap.Save(stream, ImageFormat.Jpeg);
+                        iText.Layout.Element.Image img = new iText.Layout.Element.Image(ImageDataFactory.Create(stream.ToArray()));
+
+                        // rotate and set margins
                         if(rotate && img.GetImageWidth() > img.GetImageHeight()) {
+                            img.SetRotationAngle(90 * Math.PI / 180f);
                             img.SetMargins(
                                 (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin - img.GetImageScaledWidth()) / 2f + topMargin,
                                 (pdfDoc.GetDefaultPageSize().GetWidth() - rightMargin - leftMargin - img.GetImageScaledHeight()) / 2f + rightMargin,
@@ -178,18 +193,15 @@ namespace IMG2PDF {
                                 (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin - img.GetImageScaledWidth()) / 2f + leftMargin
                             );
                         }
-                        Console.Write(
-                            "\ntop margin:" + img.GetMarginTop() +
-                            "\nbottom margin:" + img.GetMarginBottom() +
-                            "\ntop margin:" + img.GetMarginLeft() +
-                            "\nright margin:" + img.GetMarginRight()
-                        );
+
+                        // add picture to document
                         doc.Add(img);
                         if(rotate && img.GetImageWidth() > img.GetImageHeight()) {
                             pdfDoc.GetPage(pdfDoc.GetNumberOfPages()).SetRotation(90);
                         }
-                        Console.Write("\n\n");
                     }
+
+                    // close docs and save settings
                     doc.Close();
                     pdfDoc.Close();
                     settings.Default.File = sourcePathTextBox.Text;
