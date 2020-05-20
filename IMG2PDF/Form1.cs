@@ -16,6 +16,7 @@ namespace IMG2PDF {
             InitializeComponent();
 
             // fill controls from settings
+            //TODO sort out if the user messes with the settings file
             rotateCheckBox.Checked = settings.Default.Rotate;
             sourcePathTextBox.Text = settings.Default.File;
             sizeComboBox.SelectedIndex = sizeComboBox.Items.IndexOf(settings.Default.Size);
@@ -34,7 +35,8 @@ namespace IMG2PDF {
             }
         }
 
-        private void PDFButton_Click(object sender, EventArgs e) {
+        // generate and save pdf
+        private void SaveButton_Click(object sender, EventArgs e) {
             SaveFileDialog sfd = new SaveFileDialog {
                 Filter = "PDF files (*.pdf)|*.pdf"
             };
@@ -54,6 +56,7 @@ namespace IMG2PDF {
                     if(!Directory.Exists(sourcePathTextBox.Text)) {
                         throw new Exception("Source Image folder does not exist");
                     }
+                    // get list of image paths, remove anything that isn't an image
                     List<string> fileList = Directory.GetFiles(sourcePathTextBox.Text).OrderBy(f => f).ToList();
                     List<string> toRemove = null; ;
                     foreach(string file in fileList) {
@@ -77,6 +80,7 @@ namespace IMG2PDF {
                         }
                     }
                     string[] files = fileList.ToArray();
+                    // throw if there are no images
                     if(files.Length == 0) {
                         throw new Exception("Source Image folder does not contain any images");
                     }
@@ -85,10 +89,10 @@ namespace IMG2PDF {
                             SortByLeadingNum(ref files);
                             break;
                         default:
-                            break;
+                            break; // sorted alphabetically by default
                     }
 
-                    // pdf writer and document
+                    // pdf writer and document init
                     PdfWriter pdfWriter = new PdfWriter(pdfPath, new WriterProperties().SetPdfVersion(PdfVersion.PDF_2_0));
                     PdfDocument pdfDoc = new PdfDocument(pdfWriter);
 
@@ -128,13 +132,16 @@ namespace IMG2PDF {
                     }
 
                     pdfDoc.SetDefaultPageSize(pageSize);
+                    float pageWidth = pdfDoc.GetDefaultPageSize().GetWidth();
+                    float pageHeight = pdfDoc.GetDefaultPageSize().GetHeight();
 
                     // set writable doc
                     Document doc = new Document(pdfDoc);
 
-                    // set margins to zero
+                    // set document margins to zero
                     doc.SetMargins(0, 0, 0, 0);
 
+                    //TODO do this on a different thread
                     for(int i = 0; i < files.Length; i++) {
                         // create image object
                         Bitmap sourceBitmap = new Bitmap(files[i]);
@@ -142,12 +149,12 @@ namespace IMG2PDF {
                         // calculate ratios for resizing, based on whether to rotate or not
                         float widthRatio, heightRatio;
                         if(rotate && sourceBitmap.Width > sourceBitmap.Height) {
-                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / sourceBitmap.Height;
-                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / sourceBitmap.Width;
+                            widthRatio = (pageHeight - leftMargin - rightMargin ) / sourceBitmap.Width;
+                            heightRatio = (pageWidth - topMargin - bottomMargin) / sourceBitmap.Height;
                         }
                         else {
-                            widthRatio = (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin) / sourceBitmap.Width;
-                            heightRatio = (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin) / sourceBitmap.Height;
+                            widthRatio = (pageWidth - leftMargin - rightMargin) / sourceBitmap.Width;
+                            heightRatio = (pageHeight - topMargin - bottomMargin) / sourceBitmap.Height;
                         }
                         // if margins are too big, throw exception
                         if(widthRatio < 0 || heightRatio < 0) {
@@ -179,20 +186,22 @@ namespace IMG2PDF {
                         if(rotate && img.GetImageWidth() > img.GetImageHeight()) {
                             img.SetRotationAngle(90 * Math.PI / 180f);
                             img.SetMargins(
-                                (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin - img.GetImageScaledWidth()) / 2f + topMargin,
-                                (pdfDoc.GetDefaultPageSize().GetWidth() - rightMargin - leftMargin - img.GetImageScaledHeight()) / 2f + rightMargin,
-                                (pdfDoc.GetDefaultPageSize().GetHeight() - bottomMargin - topMargin - img.GetImageScaledWidth()) / 2f + bottomMargin,
-                                (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin - img.GetImageScaledHeight()) / 2f + leftMargin
+                                (pageHeight - rightMargin - leftMargin - img.GetImageWidth()) / 2 + rightMargin,
+                                (pageWidth - bottomMargin - topMargin - img.GetImageHeight()) / 2 + bottomMargin,
+                                (pageHeight - leftMargin - rightMargin - img.GetImageWidth()) / 2 + leftMargin,
+                                (pageWidth - topMargin - bottomMargin - img.GetImageHeight()) / 2 + topMargin
                             );
                         }
                         else {
                             img.SetMargins(
-                                (pdfDoc.GetDefaultPageSize().GetHeight() - topMargin - bottomMargin - img.GetImageScaledHeight()) / 2f + topMargin,
-                                (pdfDoc.GetDefaultPageSize().GetWidth() - rightMargin - leftMargin - img.GetImageScaledWidth()) / 2f + rightMargin,
-                                (pdfDoc.GetDefaultPageSize().GetHeight() - bottomMargin - topMargin - img.GetImageScaledHeight()) / 2f + bottomMargin,
-                                (pdfDoc.GetDefaultPageSize().GetWidth() - leftMargin - rightMargin - img.GetImageScaledWidth()) / 2f + leftMargin
+                                (pageHeight - topMargin - bottomMargin - img.GetImageHeight()) / 2f + topMargin,
+                                (pageWidth - rightMargin - leftMargin - img.GetImageWidth()) / 2f + rightMargin,
+                                (pageHeight - bottomMargin - topMargin - img.GetImageHeight()) / 2f + bottomMargin,
+                                (pageWidth - leftMargin - rightMargin - img.GetImageWidth()) / 2f + leftMargin
                             );
                         }
+
+
 
                         // add picture to document
                         doc.Add(img);
@@ -220,9 +229,10 @@ namespace IMG2PDF {
             }
         }
 
-        // sorts a list of strings by the leading number in the string
+        // sorts a list of path strings by the leading number in the filename
         private void SortByLeadingNum(ref string[] list) {
             int[] ints = new int[list.Length];
+            // retrieve number
             for(int i = 0; i < list.Length; i++) {
                 string sNum = "";
                 for(int c = 0; c < list[i].Length; c++) {
@@ -244,7 +254,8 @@ namespace IMG2PDF {
 
             int tempInt;
             string tempString;
-
+            // sort
+            // TODO more efficient sort?
             for(int j = list.Length - 1; j > 0; j--) {
                 for(int i = 0; i < j; i++) {
                     if(ints[i] > ints[i + 1]) {

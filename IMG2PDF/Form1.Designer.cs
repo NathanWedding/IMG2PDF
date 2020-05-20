@@ -64,7 +64,7 @@
             this.StartButton.TabIndex = 0;
             this.StartButton.Text = "Save";
             this.StartButton.UseVisualStyleBackColor = true;
-            this.StartButton.Click += new System.EventHandler(this.PDFButton_Click);
+            this.StartButton.Click += new System.EventHandler(this.SaveButton_Click);
             // 
             // browseButton
             // 
